@@ -17,12 +17,6 @@ import zipfile
 import os
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-class MyCallback(tf.keras.callbacks.Callback):
-    def on_epoch_end(self, epoch, logs={}):
-        if logs.get('accuracy') >= 0.96 and logs.get('val_accuracy') >= 0.96:
-            print("\nReached 96% accuracy so stopping training!")
-            self.model.stop_training = True
-
 def solution_C3():
     data_url = 'https://github.com/dicodingacademy/assets/raw/main/Simulation/machine_learning/cats_and_dogs.zip'
     urllib.request.urlretrieve(data_url, 'cats_and_dogs.zip')
@@ -37,11 +31,11 @@ def solution_C3():
 
     train_datagen = ImageDataGenerator(
         rescale=1./255,
-        rotation_range=40,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        shear_range=0.2,
-        zoom_range=0.2,
+        rotation_range=30,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        shear_range=0.1,
+        zoom_range=0.1,
         horizontal_flip=True,
         fill_mode='nearest',
     )
@@ -58,7 +52,8 @@ def solution_C3():
         color_mode='rgb',
         seed=42,
         shuffle=True,
-        class_mode='binary'
+        class_mode='binary',
+        batch_size=42
     )
 
     validation_generator = validation_datagen.flow_from_directory(
@@ -67,42 +62,41 @@ def solution_C3():
         color_mode='rgb',
         seed=42,
         shuffle=True,
-        class_mode='binary'
+        class_mode='binary',
+        batch_size=21
     )
-
-    base_model = tf.keras.applications.MobileNetV2(
-        input_shape=(150, 150, 3),
-        include_top=False,
-        weights='imagenet'
-    )
-
-    # Freeze the base model
-    base_model.trainable = False
 
     model = tf.keras.models.Sequential([
-        base_model,
-        tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
-        tf.keras.layers.MaxPooling2D((2, 2)),
-        tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-        tf.keras.layers.MaxPooling2D((2, 2)),
-        tf.keras.layers.GlobalAveragePooling2D(),
+        tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Conv2D(32, (3, 3), activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Flatten(),
         tf.keras.layers.Dropout(0.4),
-        tf.keras.layers.Dense(64, activation='relu'),
+        tf.keras.layers.Dense(256, activation='relu'),
         tf.keras.layers.Dropout(0.2),
         tf.keras.layers.Dense(1, activation='sigmoid')
     ])
 
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=7e-4),
         loss=tf.keras.losses.BinaryCrossentropy(),
         metrics=['accuracy']
     )
 
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
         monitor="val_loss",
-        factor=0.3,
+        factor=0.2,
         patience=3,
-        min_lr=1e-6,
+        min_lr=1e-8,
         verbose=2
     )
 
@@ -116,10 +110,9 @@ def solution_C3():
 
     model.fit(
         train_generator,
-        batch_size=64,
         validation_data=validation_generator,
         epochs=50,
-        callbacks=[MyCallback(), reduce_lr, early_stop]
+        callbacks=[reduce_lr, early_stop]
     )
 
     return model

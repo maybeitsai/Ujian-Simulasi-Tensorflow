@@ -42,7 +42,7 @@ def windowed_dataset(series, batch_size, n_past=24, n_future=24, shift=1):
     dataset = tf.data.Dataset.from_tensor_slices(series)
     dataset = dataset.window(size=n_past+n_future, shift=shift, drop_remainder=True)
     dataset = dataset.flat_map(lambda window: window.batch(n_past+n_future))
-    dataset = dataset.map(lambda window: (window[:n_past], window[n_past:]))
+    dataset = dataset.map(lambda window: (window[:-n_future], window[-n_future:, :1]))
     dataset = dataset.shuffle(buffer_size=1000)
     dataset = dataset.batch(batch_size).prefetch(1)
 
@@ -58,7 +58,7 @@ def solution_C5():
 
     # Number of features in the dataset. We use all features as predictors to
     # predict all features at future time steps.
-    N_FEATURES = len(df.columns)
+    N_FEATURES = 7
 
     # Normalizes the data
     # DO NOT CHANGE THIS
@@ -82,15 +82,15 @@ def solution_C5():
     valid_set = windowed_dataset(x_valid, BATCH_SIZE, N_PAST, N_FUTURE,SHIFT)
 
     # Code to define your model.
+    # Whatever your first layer is, the input shape will be (N_PAST = 24, N_FEATURES = 7)
     model = tf.keras.models.Sequential([
-        tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
-                                                           input_shape=[N_PAST, N_FEATURES])),
-        tf.keras.layers.Dropout(0.4),
+        tf.keras.layers.InputLayer(input_shape=(N_PAST, N_FEATURES)),
         tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True)),
-        tf.keras.layers.Dropout(0.3),
-        tf.keras.layers.Dense(32,activation='relu'),
+        tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True)),
+        tf.keras.layers.Dropout(0.4),
+        tf.keras.layers.Dense(32, activation='relu'),
         tf.keras.layers.Dropout(0.2),
-        tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(N_FEATURES))
+        tf.keras.layers.Dense(N_FUTURE)
     ])
 
     # Code to train and compile the model
